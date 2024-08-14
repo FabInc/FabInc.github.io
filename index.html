@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Health Centres and Schools in Northern Nigeria</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
     <style>
         html, body {
             height: 100%;
@@ -42,21 +42,22 @@
             margin-bottom: 15px;
         }
     </style>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
 </head>
 <body>
-<div id="map"></div>
-<div id="sidebar">
-    <button onclick="toggleSidebar()">Close</button>
-    <div id="facility-info-container"></div>
-</div>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
-<script>
-    var map = L.map('map').setView([12.005139, 9.279495], 6);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 18,
-    }).addTo(map);
+    <div id="map"></div>
+    <div id="sidebar">
+        <button onclick="toggleSidebar()">Close</button>
+        <div id="facility-info-container"></div>
+    </div>
 
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var map = L.map('map').setView([12.005139, 9.279495], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+        }).addTo(map);
     // Embedded JSON data - expand for all, hard coded at moment as json didn't work
     var facilities = [
     {
@@ -2099,12 +2100,11 @@
             "General / Other.4": "All classrooms are to be made accessible with necessary ramps and guard rails"
         }
     }
-]
-;
+];
 var markers = L.markerClusterGroup();
 
 facilities.forEach(function(facility) {
-    if (facility.lat && facility.lng) {
+    if (facility.lat && facility.lng && !isNaN(facility.lat) && !isNaN(facility.lng)) {
         var marker = L.marker([facility.lat, facility.lng]);
         marker.bindPopup(facility.name);
         marker.on('click', function() {
@@ -2117,28 +2117,29 @@ facilities.forEach(function(facility) {
 
 map.addLayer(markers);
 
-    function showFacilityInfo(facility) {
-        var container = document.getElementById('facility-info-container');
-        container.innerHTML = `<h3>${facility.name}</h3>`;
-        for (var key in facility.interventions) {
-            var intervention = facility.interventions[key];
-            container.innerHTML += `<div class="facility-info"><strong>${key}:</strong> ${intervention}</div>`;
-        }
+function showFacilityInfo(facility) {
+    var container = document.getElementById('facility-info-container');
+    container.innerHTML = `<h3>${facility.name}</h3>`;
+    for (var key in facility.interventions) {
+        var intervention = facility.interventions[key];
+        container.innerHTML += `<div class="facility-info"><strong>${key}:</strong> ${intervention}</div>`;
     }
+}
 
-    function toggleSidebar(visible) {
-        if (visible === undefined) {
-            document.body.classList.toggle('sidebar-visible');
-        } else if (visible) {
-            document.body.classList.add('sidebar-visible');
-        } else {
-            document.body.classList.remove('sidebar-visible');
-        }
+window.toggleSidebar = function(visible) {
+    if (visible === undefined) {
+        document.body.classList.toggle('sidebar-visible');
+    } else if (visible) {
+        document.body.classList.add('sidebar-visible');
+    } else {
+        document.body.classList.remove('sidebar-visible');
     }
+}
 
-    window.addEventListener('resize', function() {
-        map.invalidateSize();
-    });
+window.addEventListener('resize', function() {
+    map.invalidateSize();
+});
+});
 </script>
 </body>
 </html>
