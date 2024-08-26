@@ -79,36 +79,31 @@
 </head>
 <body>
     <h1>Facility Map - Settings</h1>
+    <input type="file" id="fileInput" accept=".xlsx, .xls">
+    <button onclick="uploadData()">Upload Excel</button>
     
-    <h2>Upload Facility Data</h2>
-    <input type="file" id="fileInput" accept=".json">
-    <button onclick="uploadData()">Upload</button>
+    <div id="columnSelector" style="display: none;">
+        <h2>Select columns to display:</h2>
+        <div id="columnCheckboxes"></div>
+        <button onclick="processSelectedColumns()">Process Selected Columns</button>
+    </div>
 
-    <h2>Facility List</h2>
     <ul id="facilityList"></ul>
 
     <div id="editModal">
         <div class="modal-content">
             <span class="close">&times;</span>
             <h2>Edit Facility</h2>
-            <form id="editForm">
-                <label for="editName">Name:</label>
-                <input type="text" id="editName" required><br><br>
-                <label for="editLat">Latitude:</label>
-                <input type="number" id="editLat" step="any" required><br><br>
-                <label for="editLng">Longitude:</label>
-                <input type="number" id="editLng" step="any" required><br><br>
-                <h3>Interventions:</h3>
-                <div id="interventionsContainer"></div>
-                <button type="button" onclick="addIntervention()">Add Intervention</button><br><br>
-                <button type="submit">Save Changes</button>
-            </form>
+            <form id="editForm"></form>
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
     <script>
         let facilities = [];
         let editingIndex = -1;
+        let excelData = [];
+        let headers = [];
 
         function uploadData() {
             const fileInput = document.getElementById('fileInput');
@@ -117,17 +112,57 @@
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     try {
-                        facilities = JSON.parse(e.target.result);
-                        updateFacilityList();
-                        alert('Data uploaded successfully!');
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        excelData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                        headers = excelData[0];
+                        displayColumnSelector();
                     } catch (error) {
-                        alert('Error parsing JSON file. Please make sure it\'s a valid JSON.');
+                        console.error(error);
+                        alert('Error parsing Excel file. Please make sure it\'s a valid Excel file.');
                     }
                 };
-                reader.readAsText(file);
+                reader.readAsArrayBuffer(file);
             } else {
                 alert('Please select a file to upload.');
             }
+        }
+
+        function displayColumnSelector() {
+            const columnSelector = document.getElementById('columnSelector');
+            const columnCheckboxes = document.getElementById('columnCheckboxes');
+            columnCheckboxes.innerHTML = '';
+            headers.forEach((header, index) => {
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `column-${index}`;
+                checkbox.value = header;
+                const label = document.createElement('label');
+                label.htmlFor = `column-${index}`;
+                label.textContent = header;
+                columnCheckboxes.appendChild(checkbox);
+                columnCheckboxes.appendChild(label);
+                columnCheckboxes.appendChild(document.createElement('br'));
+            });
+            columnSelector.style.display = 'block';
+        }
+
+        function processSelectedColumns() {
+            const selectedColumns = Array.from(document.querySelectorAll('#columnCheckboxes input:checked')).map(cb => cb.value);
+            facilities = excelData.slice(1).map(row => {
+                const facility = {};
+                selectedColumns.forEach(column => {
+                    const index = headers.indexOf(column);
+                    if (index !== -1) {
+                        facility[column] = row[index];
+                    }
+                });
+                return facility;
+            });
+            updateFacilityList();
+            document.getElementById('columnSelector').style.display = 'none';
         }
 
         function updateFacilityList() {
@@ -148,33 +183,37 @@
         function editFacility(index) {
             editingIndex = index;
             const facility = facilities[index];
-            document.getElementById('editName').value = facility.name;
-            document.getElementById('editLat').value = facility.lat;
-            document.getElementById('editLng').value = facility.lng;
-            
-            const container = document.getElementById('interventionsContainer');
-            container.innerHTML = '';
-            for (const [key, value] of Object.entries(facility.interventions)) {
-                addInterventionField(key, value);
-            }
-            
+            const form = document.getElementById('editForm');
+            form.innerHTML = '';
+            Object.keys(facility).forEach(key => {
+                const label = document.createElement('label');
+                label.textContent = key;
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.name = key;
+                input.value = facility[key];
+                form.appendChild(label);
+                form.appendChild(input);
+                form.appendChild(document.createElement('br'));
+            });
+            const submitButton = document.createElement('input');
+            submitButton.type = 'submit';
+            submitButton.value = 'Save Changes';
+            form.appendChild(submitButton);
             document.getElementById('editModal').style.display = 'block';
         }
 
-        function addIntervention() {
-            addInterventionField('', '');
-        }
-
-        function addInterventionField(key, value) {
-            const container = document.getElementById('interventionsContainer');
-            const div = document.createElement('div');
-            div.innerHTML = `
-                <input type="text" placeholder="Key" value="${key}" class="intervention-key">
-                <input type="text" placeholder="Value" value="${value}" class="intervention-value">
-                <button type="button" onclick="this.parentElement.remove()">Remove</button>
-            `;
-            container.appendChild(div);
-        }
+        document.getElementById('editForm').onsubmit = function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const updatedFacility = {};
+            for (let [key, value] of formData.entries()) {
+                updatedFacility[key] = value;
+            }
+            facilities[editingIndex] = updatedFacility;
+            updateFacilityList();
+            document.getElementById('editModal').style.display = 'none';
+        };
 
         function deleteFacility(index) {
             if (confirm('Are you sure you want to delete this facility?')) {
@@ -182,26 +221,6 @@
                 updateFacilityList();
             }
         }
-
-        document.getElementById('editForm').onsubmit = function(e) {
-            e.preventDefault();
-            const name = document.getElementById('editName').value;
-            const lat = parseFloat(document.getElementById('editLat').value);
-            const lng = parseFloat(document.getElementById('editLng').value);
-            
-            const interventions = {};
-            const keys = document.querySelectorAll('.intervention-key');
-            const values = document.querySelectorAll('.intervention-value');
-            for (let i = 0; i < keys.length; i++) {
-                if (keys[i].value) {
-                    interventions[keys[i].value] = values[i].value;
-                }
-            }
-
-            facilities[editingIndex] = { name, lat, lng, interventions };
-            updateFacilityList();
-            document.getElementById('editModal').style.display = 'none';
-        };
 
         document.querySelector('.close').onclick = function() {
             document.getElementById('editModal').style.display = 'none';
