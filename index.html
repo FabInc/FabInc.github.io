@@ -76,11 +76,13 @@
             cursor: pointer;
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 </head>
 <body>
     <h1>Facility Map - Settings</h1>
-    <input type="file" id="fileInput" accept=".xlsx, .xls">
-    <button onclick="uploadData()">Upload Excel</button>
+    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
+    <button onclick="uploadData()">Upload File</button>
     
     <div id="columnSelector" style="display: none;">
         <h2>Select columns to display:</h2>
@@ -98,33 +100,49 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
     <script>
         let facilities = [];
         let editingIndex = -1;
-        let excelData = [];
+        let fileData = [];
         let headers = [];
 
         function uploadData() {
             const fileInput = document.getElementById('fileInput');
             const file = fileInput.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    try {
-                        const data = new Uint8Array(e.target.result);
-                        const workbook = XLSX.read(data, {type: 'array'});
-                        const firstSheetName = workbook.SheetNames[0];
-                        const worksheet = workbook.Sheets[firstSheetName];
-                        excelData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
-                        headers = excelData[0];
-                        displayColumnSelector();
-                    } catch (error) {
-                        console.error(error);
-                        alert('Error parsing Excel file. Please make sure it\'s a valid Excel file.');
-                    }
-                };
-                reader.readAsArrayBuffer(file);
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+                if (fileExtension === 'csv') {
+                    Papa.parse(file, {
+                        complete: function(results) {
+                            fileData = results.data;
+                            headers = fileData[0];
+                            displayColumnSelector();
+                        },
+                        error: function(error) {
+                            console.error(error);
+                            alert('Error parsing CSV file. Please make sure it\'s a valid CSV file.');
+                        }
+                    });
+                } else if (['xlsx', 'xls'].includes(fileExtension)) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, {type: 'array'});
+                            const firstSheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[firstSheetName];
+                            fileData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                            headers = fileData[0];
+                            displayColumnSelector();
+                        } catch (error) {
+                            console.error(error);
+                            alert('Error parsing Excel file. Please make sure it\'s a valid Excel file.');
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    alert('Unsupported file type. Please upload a CSV or Excel file.');
+                }
             } else {
                 alert('Please select a file to upload.');
             }
@@ -151,7 +169,7 @@
 
         function processSelectedColumns() {
             const selectedColumns = Array.from(document.querySelectorAll('#columnCheckboxes input:checked')).map(cb => cb.value);
-            facilities = excelData.slice(1).map(row => {
+            facilities = fileData.slice(1).map(row => {
                 const facility = {};
                 selectedColumns.forEach(column => {
                     const index = headers.indexOf(column);
