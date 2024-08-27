@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Facility Map - Settings</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -75,36 +76,27 @@
             text-decoration: none;
             cursor: pointer;
         }
+        #map { height: 600px; width: 100%; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 </head>
 <body>
-    <h1>Facility Map - Settings</h1>
+    <h1>Facility Map</h1>
     <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
     <button onclick="uploadData()">Upload File</button>
     
     <div id="columnSelector" style="display: none;">
         <h2>Select columns to display:</h2>
         <div id="columnCheckboxes"></div>
-        <button onclick="processSelectedColumns()">Process Selected Columns</button>
+        <button onclick="processSelectedColumns()">Show Map</button>
     </div>
 
-    <ul id="facilityList"></ul>
-
-    <div id="editModal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>Edit Facility</h2>
-            <form id="editForm"></form>
-        </div>
-    </div>
+    <div id="map" style="display: none;"></div>
 
     <script>
         let facilities = [];
-        let editingIndex = -1;
-        let fileData = [];
-        let headers = [];
+        let map;
 
         function uploadData() {
             const fileInput = document.getElementById('fileInput');
@@ -179,76 +171,41 @@
                 });
                 return facility;
             });
-            updateFacilityList();
             document.getElementById('columnSelector').style.display = 'none';
+            initializeMap();
         }
 
-        function updateFacilityList() {
-            const list = document.getElementById('facilityList');
-            list.innerHTML = '';
-            facilities.forEach((facility, index) => {
-                const li = document.createElement('li');
-                li.className = 'facility-item';
-                li.innerHTML = `
-                    <span class="facility-name">${facility.name}</span>
-                    <button class="edit-btn" onclick="editFacility(${index})">Edit</button>
-                    <button class="delete-btn" onclick="deleteFacility(${index})">Delete</button>
-                `;
-                list.appendChild(li);
+        function initializeMap() {
+            document.getElementById('map').style.display = 'block';
+            if (!map) {
+                map = L.map('map').setView([9.082, 8.6753], 6); // Center on Nigeria
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+            }
+
+            // Clear existing markers
+            map.eachLayer(layer => {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+
+            // Add markers for facilities
+            facilities.forEach(facility => {
+                if (facility.Latitude && facility.Longitude) {
+                    const lat = parseFloat(facility.Latitude);
+                    const lng = parseFloat(facility.Longitude);
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        L.marker([lat, lng])
+                            .addTo(map)
+                            .bindPopup(`<b>${facility['A5. Full Name of Educational Facility']}</b><br>${facility['A6. Address of facility location']}`);
+                    }
+                }
             });
         }
 
-        function editFacility(index) {
-            editingIndex = index;
-            const facility = facilities[index];
-            const form = document.getElementById('editForm');
-            form.innerHTML = '';
-            Object.keys(facility).forEach(key => {
-                const label = document.createElement('label');
-                label.textContent = key;
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.name = key;
-                input.value = facility[key];
-                form.appendChild(label);
-                form.appendChild(input);
-                form.appendChild(document.createElement('br'));
-            });
-            const submitButton = document.createElement('input');
-            submitButton.type = 'submit';
-            submitButton.value = 'Save Changes';
-            form.appendChild(submitButton);
-            document.getElementById('editModal').style.display = 'block';
-        }
-
-        document.getElementById('editForm').onsubmit = function(e) {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const updatedFacility = {};
-            for (let [key, value] of formData.entries()) {
-                updatedFacility[key] = value;
-            }
-            facilities[editingIndex] = updatedFacility;
-            updateFacilityList();
-            document.getElementById('editModal').style.display = 'none';
-        };
-
-        function deleteFacility(index) {
-            if (confirm('Are you sure you want to delete this facility?')) {
-                facilities.splice(index, 1);
-                updateFacilityList();
-            }
-        }
-
-        document.querySelector('.close').onclick = function() {
-            document.getElementById('editModal').style.display = 'none';
-        };
-
-        window.onclick = function(event) {
-            if (event.target == document.getElementById('editModal')) {
-                document.getElementById('editModal').style.display = 'none';
-            }
-        };
+        // Remove unnecessary functions like updateFacilityList, editFacility, deleteFacility
     </script>
 </body>
 </html>
